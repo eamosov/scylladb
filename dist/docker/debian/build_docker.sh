@@ -59,7 +59,7 @@ bcp() { buildah copy "$container" "$@"; }
 run() { buildah run "$container" "$@"; }
 bconfig() { buildah config "$@" "$container"; }
 
-
+agent=scylla-manager.tar.gz
 bcp "${packages[@]}" packages/
 
 bcp dist/docker/etc etc/
@@ -70,6 +70,7 @@ bcp dist/docker/commandlineparser.py /commandlineparser.py
 bcp dist/docker/docker-entrypoint.py /docker-entrypoint.py
 
 bcp dist/docker/scylla_bashrc /scylla_bashrc
+bcp dist/docker/debian/$agent packages/ 
 
 run apt-get -y clean expire-cache
 run apt-get -y update
@@ -77,10 +78,15 @@ run apt-get -y upgrade
 run apt-get -y --no-install-suggests install dialog apt-utils
 run bash -ec "echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections"
 run bash -ec "rm -rf /etc/rsyslog.conf"
-run apt-get -y --no-install-suggests install hostname supervisor openjdk-11-jre-headless python2 python3 python3-yaml curl rsyslog sudo
+run apt-get -y --no-install-suggests install hostname supervisor openjdk-11-jre-headless python2 python3 python3-yaml curl rsyslog sudo iproute2 xfsprogs vim less iputils-ping net-tools
 run bash -ec "echo LANG=C.UTF-8 > /etc/default/locale"
 run bash -ec "dpkg -i packages/*.deb"
 run apt-get -y clean all
+run tar -C opt/scylladb -xzf packages/$agent scripts
+run tar -C etc/scylla -xzf packages/$agent  --strip-components 1 etc/scylla-manager-agent.yaml
+run tar -C opt/scylladb/bin -xzf packages/$agent scylla-manager-agent
+bcp dist/docker/debian/scylla-manager-agent.conf /etc/supervisord.conf.d/
+run rm -rf packages
 run bash -ec "cat /scylla_bashrc >> /etc/bash.bashrc"
 run mkdir -p /etc/supervisor.conf.d
 run mkdir -p /var/log/scylla
